@@ -59,6 +59,9 @@ def build_timeline(
     up by the forecast's own horizon (target - issue time), which is what the error model is
     indexed by.
 
+    Prices are shown including the supplier markup (if an agreement is configured); everything
+    stored and modelled is markup-free, and the markup is a constant shift of all quantiles.
+
     ``prefer`` picks the band shown when both are available: the publisher's own (asymmetric)
     p10/p90, or the learned Gaussian EWMA band. The other one is the fallback.
     """
@@ -71,15 +74,16 @@ def build_timeline(
         t = start + timedelta(hours=i)
         local = t.astimezone(tz).isoformat()
         if (fh := firm_by_hour.get(t)) is not None:
+            shown = fh.price_with_markup
             out.append(
                 {
                     "datetime": local,
-                    "price": fh.price,
+                    "price": shown,
                     "is_forecast": False,
                     "horizon_hours": i,
-                    "p10": fh.price,
-                    "p50": fh.price,
-                    "p90": fh.price,
+                    "p10": shown,
+                    "p50": shown,
+                    "p90": shown,
                     "band_source": None,
                 }
             )
@@ -94,6 +98,10 @@ def build_timeline(
             other = BAND_MODEL if prefer == BAND_PUBLISHER else BAND_PUBLISHER
             source = prefer if prefer in bands else other if other in bands else None
             p10, p50, p90 = bands[source] if source else (None, price, None)
+            markup = firm.markup_kr(fc.local_hour) if firm else 0.0
+            price, p10, p50, p90 = (
+                None if v is None else round(v + markup, 4) for v in (price, p10, p50, p90)
+            )
             out.append(
                 {
                     "datetime": local,

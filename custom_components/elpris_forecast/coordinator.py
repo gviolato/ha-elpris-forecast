@@ -17,6 +17,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import FirmData, ForecastData, parse_prognose, parse_timepris
 from .const import (
+    CONF_AGREEMENT,
     CONF_BAND_SOURCE,
     CONF_FORGETTING_FACTOR,
     CONF_MIN_EFFECTIVE_N,
@@ -77,6 +78,7 @@ class ElprisCoordinator(DataUpdateCoordinator[ElprisData]):
         self.min_effective_n = float(opts.get(CONF_MIN_EFFECTIVE_N, DEFAULT_MIN_EFFECTIVE_N))
         self.smoothing_hours = int(opts.get(CONF_SMOOTHING_HOURS, DEFAULT_SMOOTHING_HOURS))
         self.band_source = str(opts.get(CONF_BAND_SOURCE, DEFAULT_BAND_SOURCE))
+        self.agreement: str = (opts.get(CONF_AGREEMENT) or "").strip()
         self.db_path = hass.config.path(DB_FILENAME)
         self._session = async_get_clientsession(hass)
         self._store: Store | None = None
@@ -85,6 +87,7 @@ class ElprisCoordinator(DataUpdateCoordinator[ElprisData]):
         self._forecast_fetched: datetime | None = None
         self._model: ErrorModel | None = None
         self._model_updated_at: datetime | None = None
+        self._warned_fixed = False
 
     async def _async_setup(self) -> None:
         self._store = await self.hass.async_add_executor_job(Store, self.db_path)
@@ -97,7 +100,17 @@ class ElprisCoordinator(DataUpdateCoordinator[ElprisData]):
     async def _async_update_data(self) -> ElprisData:
         now = dt_util.utcnow()
         try:
-            self._firm = parse_timepris(await self._get_json(TIMEPRIS_URL, {"sted": self.place}))
+            params = {"sted": self.place}
+            if self.agreement:
+                params["aftale"] = self.agreement
+            self._firm = parse_timepris(await self._get_json(TIMEPRIS_URL, params))
+            agreement = self._firm.agreement
+            if agreement and not agreement.get("spotBased", True) and not self._warned_fixed:
+                self._warned_fixed = True
+                _LOGGER.warning(
+                    "Agreement %s is not spot-based: forecast prices will not match it",
+                    agreement.get("slug"),
+                )
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as err:
             if self._firm is None:
                 raise UpdateFailed(f"Could not fetch firm prices: {err}") from err

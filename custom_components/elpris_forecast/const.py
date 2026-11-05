@@ -14,6 +14,7 @@ CONF_MIN_SCORED_DAYS = "min_scored_days"
 CONF_MIN_EFFECTIVE_N = "min_effective_n"
 CONF_SMOOTHING_HOURS = "smoothing_hours"
 CONF_BAND_SOURCE = "band_source"
+CONF_AGREEMENT = "agreement"
 
 BAND_PUBLISHER = "publisher"
 BAND_MODEL = "model"

@@ -28,9 +28,12 @@ def _local(day: str, hour: int) -> str:
     return datetime.fromisoformat(f"{day}T{hour:02d}:00:00").replace(tzinfo=TZ).isoformat()
 
 
-def _timepris(days: dict[str, float]) -> dict:
+def _timepris(days: dict[str, float], markup: float | None = None) -> dict:
     """Firm prices: spot 100 øre incl. VAT, fixed part = `fixed` (+ 50 øre 17-20h)."""
     out = {"place": {"segment": "1234", "region": "DK1", "gridCompany": "Grid A/S"}}
+    if markup is not None:
+        out["agreement"] = {"slug": "s-p", "supplier": "S", "name": "P", "spotBased": True,
+                            "markupOreInclVat": markup}
     for key, (day, fixed) in zip(("today", "tomorrow"), days.items()):
         hours = []
         for h in range(24):
@@ -38,10 +41,11 @@ def _timepris(days: dict[str, float]) -> dict:
             hours.append(
                 {
                     "start": _local(day, h),
-                    "krPerKwhInclVat": round((100 + grid + 10) / 100, 4),
+                    "krPerKwhInclVat": round((100 + grid + 10 + (markup or 0)) / 100, 4),
                     "spotOreInclVat": 100,
                     "gridOreInclVat": grid,
                     "chargesOreInclVat": 10,
+                    **({"markupOreInclVat": markup} if markup is not None else {}),
                 }
             )
         out[key] = {"day": day, "hours": hours}
@@ -220,3 +224,25 @@ def test_dates_are_utc_in_db(tmp_path) -> None:
     store.add_actuals("p", [ActualRow(t, 0.9)], t - timedelta(hours=12))
     (r,) = store.residuals("p")
     assert r.target == t and r.horizon_hours == 30 and r.target.date() == date(2026, 3, 29)
+
+
+def test_supplier_markup_is_shown_but_not_stored(tmp_path) -> None:
+    payload = _timepris({"2026-01-05": 20, "2026-01-06": 30}, markup=9.7)
+    firm = parse_timepris(payload)
+    assert firm.hours[0].price == pytest.approx(1.30)  # markup-free
+    assert firm.hours[0].price_with_markup == pytest.approx(1.397)
+    assert firm.markup_kr(3) == pytest.approx(0.097)
+    assert parse_timepris(_timepris({"2026-01-05": 20})).markup_kr(3) == 0.0
+
+    fc = parse_prognose(_prognose("2026-01-07", "2026-01-05T08:00:00Z"), "DK1")
+    now = datetime(2026, 1, 5, 10, 30, tzinfo=UTC)
+    tl = build_timeline(now, firm, fc, None, TZ)
+    no_markup = build_timeline(now, parse_timepris(_timepris({"2026-01-05": 20, "2026-01-06": 30})), fc, None, TZ)
+    for a, b in zip(tl, no_markup):
+        for k in ("price", "p10", "p50", "p90"):
+            assert a[k] == pytest.approx(b[k] + 0.097)
+
+    from custom_components.elpris_forecast.timeline import forecast_rows
+
+    rows = forecast_rows(firm, fc)
+    assert rows[0].predicted_price == pytest.approx((80 * 1.25 + 40) / 100)  # no markup

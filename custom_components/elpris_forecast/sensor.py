@@ -30,6 +30,12 @@ async def async_setup_entry(
     async_add_entities([ElprisPriceSensor(coordinator), ElprisErrorModelSensor(coordinator)])
 
 
+def _agreement_label(agreement: dict | None) -> str | None:
+    if not agreement:
+        return None
+    return f"{agreement.get('supplier', '')} – {agreement.get('name', agreement.get('slug', ''))}"
+
+
 class _Base(CoordinatorEntity[ElprisCoordinator]):
     _attr_has_entity_name = True
     _attr_attribution = ATTRIBUTION
@@ -102,6 +108,10 @@ class ElprisPriceSensor(_Base, SensorEntity):
             "place": place.get("segment"),
             "region": data.firm.region if data.firm else None,
             "grid_company": place.get("gridCompany"),
+            "agreement": _agreement_label(data.firm.agreement if data.firm else None),
+            "supplier_markup": (
+                round(data.firm.markup_kr(dt_util.now().hour), 4) if data.firm else 0.0
+            ),
             "firm_until": data.firm.hours[-1].start.isoformat() if data.firm and data.firm.hours else None,
             "forecast_issued_at": [i.isoformat() for i in issued],
             "band_sources": sorted(

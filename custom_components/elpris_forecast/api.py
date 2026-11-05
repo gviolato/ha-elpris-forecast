@@ -2,8 +2,10 @@
 
 Pure functions only (no Home Assistant imports) so they can be unit tested and audited.
 
-* ``timepris.json?sted=<place>`` - published (firm) hourly prices for today and tomorrow,
-  all-in for the requested place: spot + grid tariff + Energinet tariffs + electricity tax, incl. VAT.
+* ``timepris.json?sted=<place>[&aftale=<agreement>]`` - published (firm) hourly prices for today
+  and tomorrow, all-in for the requested place: spot + grid tariff + Energinet tariffs + electricity
+  tax, incl. VAT, plus the supplier's per-kWh markup when an agreement is given. The markup is kept
+  apart (``markup_ore``) so that stored prices and the error model stay markup-free.
 * ``prognose.json`` - 7-day hourly forecast of the same all-in price, but computed for each price
   region's *representative* grid area. :func:`place_shifted_price` moves it onto the requested place.
 """
@@ -27,10 +29,15 @@ class FirmHour:
 
     start: datetime  # UTC
     local_hour: int  # hour of day in Danish time (tariff profiles are local-time based)
-    price: float
+    price: float  # without the supplier markup
     spot_ore: float | None
     grid_ore: float | None
     charges_ore: float | None
+    markup_ore: float = 0.0  # supplier's per-kWh markup incl. VAT (0 without an agreement)
+
+    @property
+    def price_with_markup(self) -> float:
+        return round(self.price + self.markup_ore / 100, 4)
 
     @property
     def fixed_ore(self) -> float | None:
@@ -49,6 +56,17 @@ class FirmData:
     hours: list[FirmHour]
     generated_at: datetime | None
     fixed_profile_ore: dict[int, float] = field(default_factory=dict)
+    markup_profile_ore: dict[int, float] = field(default_factory=dict)
+    agreement: dict | None = None
+
+    def markup_kr(self, local_hour: int) -> float:
+        """Supplier markup for an hour of day, kr/kWh (latest published; 0 without agreement)."""
+        if not self.markup_profile_ore:
+            return 0.0
+        ore = self.markup_profile_ore.get(local_hour)
+        if ore is None:  # e.g. the extra hour of a DST day: use the latest value seen
+            ore = next(reversed(self.markup_profile_ore.values()))
+        return ore / 100
 
 
 @dataclass(frozen=True)
@@ -84,6 +102,7 @@ def parse_timepris(payload: dict) -> FirmData:
     """Parse the firm hourly prices for today and tomorrow."""
     hours: list[FirmHour] = []
     profile: dict[int, float] = {}
+    markups: dict[int, float] = {}
     for key in ("today", "tomorrow"):
         day = payload.get(key)
         if not day:
@@ -92,18 +111,22 @@ def parse_timepris(payload: dict) -> FirmData:
             price = item.get("krPerKwhInclVat")
             if price is None:
                 continue
+            markup = float(item.get("markupOreInclVat") or 0.0)
             hour = FirmHour(
                 start=parse_ts(item["start"]),
                 local_hour=_hour_of(item["start"]),
-                price=float(price),
+                price=round(float(price) - markup / 100, 4),
                 spot_ore=item.get("spotOreInclVat"),
                 grid_ore=item.get("gridOreInclVat"),
                 charges_ore=item.get("chargesOreInclVat"),
+                markup_ore=markup,
             )
             hours.append(hour)
             # Later days overwrite earlier ones: the newest published tariffs win.
             if hour.fixed_ore is not None:
                 profile[hour.local_hour] = hour.fixed_ore
+            markups.pop(hour.local_hour, None)  # keep insertion order = recency
+            markups[hour.local_hour] = markup
     hours.sort(key=lambda h: h.start)
     place = payload.get("place") or {}
     generated = payload.get("generatedAt")
@@ -113,6 +136,8 @@ def parse_timepris(payload: dict) -> FirmData:
         hours=hours,
         generated_at=parse_ts(generated) if generated else None,
         fixed_profile_ore=profile,
+        markup_profile_ore=markups if payload.get("agreement") else {},
+        agreement=payload.get("agreement"),
     )
 
 

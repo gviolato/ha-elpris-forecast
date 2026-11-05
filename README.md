@@ -24,6 +24,15 @@ restart Home Assistant → *Settings → Devices & services → Add integration 
 The *place* is anything `elpriser.dk` accepts as `sted`: a four-digit postcode, `dk1`/`dk2`, or
 `a` + a grid area code.
 
+### Supplier markup
+
+elpriser.dk prices include VAT but not your electricity supplier's per-kWh markup (*tillæg*) or
+subscription. To see what you actually pay per kWh, set *Electricity agreement* under *Configure*
+to your product's `productSlug` from <https://elpriser.dk/data/elpriser.json> (spot-based /
+variable agreements only). The markup is then read from the API on every poll and added to all
+shown prices and bands; the stored history and the error model stay markup-free, so changing
+agreement never disturbs the residuals.
+
 ## Entities
 
 ### `sensor.<entry>_price`
@@ -35,6 +44,7 @@ State: price of the current hour in DKK/kWh. Attributes:
 | `current_price` | same as the state |
 | `timeline` | 168 hourly objects from the current hour (see below); not written to the recorder |
 | `place`, `region`, `grid_company` | as resolved by elpriser.dk |
+| `agreement`, `supplier_markup` | configured agreement and its markup (kr/kWh incl. VAT) |
 | `firm_until` | start of the last published hour |
 | `forecast_issued_at` | issue times of the forecast runs in use |
 | `band_sources` | which band sources the timeline currently uses |
@@ -46,7 +56,7 @@ Each `timeline` entry:
  "horizon_hours": 31, "p10": 2.71, "p50": 3.21, "p90": 3.88, "band_source": "publisher"}
 ```
 
-* `price`: the firm price if published, otherwise the forecast for your place.
+* `price`: the firm price if published, otherwise the forecast for your place (incl. supplier markup).
 * `horizon_hours`: hours ahead of the current hour.
 * `p10`/`p50`/`p90`: equal to `price` for firm hours; for forecast hours an 80 % interval.
 * `band_source`: `model`, `publisher` or `null` (firm hours / no band available).

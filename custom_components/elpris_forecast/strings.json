@@ -24,8 +24,9 @@
     "step": {
       "init": {
         "title": "Error model",
-        "description": "Changing these re-fits the uncertainty model from the full stored history.",
+        "description": "Changing the error-model settings re-fits it from the full stored history.",
         "data": {
+          "agreement": "Electricity agreement (optional)",
           "band_source": "Band shown on forecast hours",
           "forgetting_factor": "Forgetting factor (lambda)",
           "min_scored_days": "Minimum scored days per horizon",
@@ -33,12 +34,17 @@
           "smoothing_hours": "Horizon smoothing window (+/- hours)"
         },
         "data_description": {
+          "agreement": "productSlug from https://elpriser.dk/data/elpriser.json, e.g. 'supplier-product'. Adds the supplier's per-kWh markup to the shown prices (stored history and the error model stay markup-free). Spot-based (variable) agreements only.",
           "forgetting_factor": "Weight decay per newer residual in the same horizon. 0.95 = half-life of ~13.5 residuals (about a week).",
           "min_scored_days": "Distinct target days needed before a horizon gets its own learned band.",
           "smoothing_hours": "Neighbouring horizons pooled with a triangular kernel.",
           "band_source": "'publisher': the forecast publisher's own (asymmetric) p10/p90. 'model': the learned Gaussian EWMA band. The other one is used where the preferred band is unavailable."
         }
       }
+    },
+    "error": {
+      "invalid_agreement": "Unknown agreement for this place.",
+      "cannot_connect": "Could not reach elpriser.dk."
     }
   },
   "entity": {
