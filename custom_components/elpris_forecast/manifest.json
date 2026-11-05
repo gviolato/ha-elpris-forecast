@@ -1,0 +1,12 @@
+{
+  "domain": "elpris_forecast",
+  "name": "Elpris Forecast (DK)",
+  "codeowners": ["@gviolato"],
+  "config_flow": true,
+  "documentation": "https://github.com/gviolato/ha-elpris-forecast",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/gviolato/ha-elpris-forecast/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
