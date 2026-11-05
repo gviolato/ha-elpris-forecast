@@ -17,12 +17,14 @@ from homeassistant.util import dt as dt_util
 
 from .api import FirmData, ForecastData, parse_prognose, parse_timepris
 from .const import (
+    CONF_BAND_SOURCE,
     CONF_FORGETTING_FACTOR,
     CONF_MIN_EFFECTIVE_N,
     CONF_MIN_SCORED_DAYS,
     CONF_PLACE,
     CONF_SMOOTHING_HOURS,
     DB_FILENAME,
+    DEFAULT_BAND_SOURCE,
     DEFAULT_FORGETTING_FACTOR,
     DEFAULT_MIN_EFFECTIVE_N,
     DEFAULT_MIN_SCORED_DAYS,
@@ -74,6 +76,7 @@ class ElprisCoordinator(DataUpdateCoordinator[ElprisData]):
         self.min_scored_days = int(opts.get(CONF_MIN_SCORED_DAYS, DEFAULT_MIN_SCORED_DAYS))
         self.min_effective_n = float(opts.get(CONF_MIN_EFFECTIVE_N, DEFAULT_MIN_EFFECTIVE_N))
         self.smoothing_hours = int(opts.get(CONF_SMOOTHING_HOURS, DEFAULT_SMOOTHING_HOURS))
+        self.band_source = str(opts.get(CONF_BAND_SOURCE, DEFAULT_BAND_SOURCE))
         self.db_path = hass.config.path(DB_FILENAME)
         self._session = async_get_clientsession(hass)
         self._store: Store | None = None

@@ -11,7 +11,7 @@ from .api import (
     place_shifted_band,
     place_shifted_price,
 )
-from .const import TIMELINE_HOURS
+from .const import BAND_MODEL, BAND_PUBLISHER, TIMELINE_HOURS
 from .storage import ForecastRow
 from .uncertainty import ErrorModel
 
@@ -51,12 +51,16 @@ def build_timeline(
     model: ErrorModel | None,
     tz: tzinfo,
     hours: int = TIMELINE_HOURS,
+    prefer: str = BAND_PUBLISHER,
 ) -> list[dict]:
     """Hourly timeline from the current hour: firm price where published, else the forecast.
 
     ``horizon_hours`` is hours ahead of the current hour. The band of a forecast hour is looked
     up by the forecast's own horizon (target - issue time), which is what the error model is
     indexed by.
+
+    ``prefer`` picks the band shown when both are available: the publisher's own (asymmetric)
+    p10/p90, or the learned Gaussian EWMA band. The other one is the fallback.
     """
     start = hour_floor(now)
     firm_by_hour = {h.start: h for h in firm.hours} if firm else {}
@@ -82,13 +86,14 @@ def build_timeline(
         elif (fc := fc_by_hour.get(t)) is not None:
             price = place_shifted_price(fc, profile)
             issued_h = int((t - fc.issued_at).total_seconds() // 3600)
-            p10, p50, p90 = model.quantiles(price, issued_h) if model else (None, price, None)
-            source = "model" if p10 is not None else None
-            if source is None and (band := place_shifted_band(fc, profile)) is not None:
-                # Until our own error model has enough history for this horizon, fall back to
-                # the band the publisher computes for its forecast.
-                p10, p50, p90 = band[0], price, band[1]
-                source = "publisher"
+            bands: dict[str, tuple] = {}
+            if (pub := place_shifted_band(fc, profile)) is not None:
+                bands[BAND_PUBLISHER] = (pub[0], price, pub[1])
+            if model is not None and (own := model.quantiles(price, issued_h))[0] is not None:
+                bands[BAND_MODEL] = own
+            other = BAND_MODEL if prefer == BAND_PUBLISHER else BAND_PUBLISHER
+            source = prefer if prefer in bands else other if other in bands else None
+            p10, p50, p90 = bands[source] if source else (None, price, None)
             out.append(
                 {
                     "datetime": local,

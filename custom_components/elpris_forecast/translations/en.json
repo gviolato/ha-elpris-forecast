@@ -4,15 +4,21 @@
       "user": {
         "title": "Elpris Forecast",
         "description": "Track the all-in hourly electricity price (spot + grid tariff + charges, incl. VAT) for a place in Denmark, with a 7-day forecast and learned uncertainty bands.",
-        "data": { "place": "Place" },
-        "data_description": { "place": "Four-digit postcode, dk1/dk2, or 'a' + grid area code (as accepted by elpriser.dk)." }
+        "data": {
+          "place": "Place"
+        },
+        "data_description": {
+          "place": "Four-digit postcode, dk1/dk2, or 'a' + grid area code (as accepted by elpriser.dk)."
+        }
       }
     },
     "error": {
       "invalid_place": "Not a valid place.",
       "cannot_connect": "Could not reach elpriser.dk."
     },
-    "abort": { "already_configured": "This place is already configured." }
+    "abort": {
+      "already_configured": "This place is already configured."
+    }
   },
   "options": {
     "step": {
@@ -20,6 +26,7 @@
         "title": "Error model",
         "description": "Changing these re-fits the uncertainty model from the full stored history.",
         "data": {
+          "band_source": "Band shown on forecast hours",
           "forgetting_factor": "Forgetting factor (lambda)",
           "min_scored_days": "Minimum scored days per horizon",
           "min_effective_n": "Minimum effective sample size per horizon",
@@ -27,16 +34,21 @@
         },
         "data_description": {
           "forgetting_factor": "Weight decay per newer residual in the same horizon. 0.95 = half-life of ~13.5 residuals (about a week).",
-          "min_scored_days": "Distinct target days needed before a horizon gets its own band (until then the publisher's band is shown).",
-          "smoothing_hours": "Neighbouring horizons pooled with a triangular kernel."
+          "min_scored_days": "Distinct target days needed before a horizon gets its own learned band.",
+          "smoothing_hours": "Neighbouring horizons pooled with a triangular kernel.",
+          "band_source": "'publisher': the forecast publisher's own (asymmetric) p10/p90. 'model': the learned Gaussian EWMA band. The other one is used where the preferred band is unavailable."
         }
       }
     }
   },
   "entity": {
     "sensor": {
-      "price": { "name": "Price" },
-      "error_model": { "name": "Forecast error model" }
+      "price": {
+        "name": "Price"
+      },
+      "error_model": {
+        "name": "Forecast error model"
+      }
     }
   }
 }

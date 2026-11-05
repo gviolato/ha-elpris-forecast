@@ -88,7 +88,9 @@ class ElprisPriceSensor(_Base, SensorEntity):
             return
         now = dt_util.utcnow()
         tz = dt_util.get_default_time_zone()
-        self._timeline = build_timeline(now, data.firm, data.forecast, data.model, tz)
+        self._timeline = build_timeline(
+            now, data.firm, data.forecast, data.model, tz, prefer=self.coordinator.band_source
+        )
         current = self._timeline[0] if self._timeline else None
         if current is not None and dt_util.parse_datetime(current["datetime"]) != hour_floor(now):
             current = None
@@ -141,6 +143,7 @@ class ElprisErrorModelSensor(_Base, SensorEntity):
             "min_scored_days": c.min_scored_days,
             "min_effective_n": c.min_effective_n,
             "smoothing_hours": c.smoothing_hours,
+            "band_source": c.band_source,
             "db_forecast_rows": data.counts.get("forecasts"),
             "db_scored_rows": data.counts.get("scored"),
             "db_actual_rows": data.counts.get("actuals"),

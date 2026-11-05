@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 import math
 import random
@@ -197,9 +198,19 @@ def test_timeline_merges_firm_forecast_and_bands() -> None:
     assert [e["horizon_hours"] for e in tl] == list(range(len(tl)))
 
     trained = ErrorModel(0.95, 3, 5, 6).fit(_residuals(5, range(1, 169), 0.1))
+    # default: the publisher's band wins even when our model is ready
     fcs = [e for e in build_timeline(now, firm, fc, trained, TZ) if e["is_forecast"]]
+    assert all(e["band_source"] == "publisher" for e in fcs)
+    fcs = [e for e in build_timeline(now, firm, fc, trained, TZ, prefer="model") if e["is_forecast"]]
     assert all(e["band_source"] == "model" for e in fcs)
     assert all(math.isclose(e["p90"] - e["p50"], e["p50"] - e["p10"], abs_tol=1e-3) for e in fcs)
+    # no publisher band -> the model is the fallback
+    bare = parse_prognose(_prognose("2026-01-07", "2026-01-05T08:00:00Z"), "DK1")
+    bare.hours = [replace(h, p10_ore=None, p90_ore=None) for h in bare.hours]
+    fcs = [e for e in build_timeline(now, firm, bare, trained, TZ) if e["is_forecast"]]
+    assert all(e["band_source"] == "model" for e in fcs)
+    fcs = [e for e in build_timeline(now, firm, bare, empty, TZ) if e["is_forecast"]]
+    assert all(e["band_source"] is None and e["p10"] is None for e in fcs)
 
 
 def test_dates_are_utc_in_db(tmp_path) -> None:

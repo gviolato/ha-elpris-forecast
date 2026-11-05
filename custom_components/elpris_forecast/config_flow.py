@@ -13,11 +13,15 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
+    BAND_MODEL,
+    BAND_PUBLISHER,
+    CONF_BAND_SOURCE,
     CONF_FORGETTING_FACTOR,
     CONF_MIN_EFFECTIVE_N,
     CONF_MIN_SCORED_DAYS,
     CONF_PLACE,
     CONF_SMOOTHING_HOURS,
+    DEFAULT_BAND_SOURCE,
     DEFAULT_FORGETTING_FACTOR,
     DEFAULT_MIN_EFFECTIVE_N,
     DEFAULT_MIN_SCORED_DAYS,
@@ -81,6 +85,9 @@ class ElprisOptionsFlow(OptionsFlowWithReload):
         o = self.config_entry.options
         schema = vol.Schema(
             {
+                vol.Required(
+                    CONF_BAND_SOURCE, default=o.get(CONF_BAND_SOURCE, DEFAULT_BAND_SOURCE)
+                ): vol.In([BAND_PUBLISHER, BAND_MODEL]),
                 vol.Required(
                     CONF_FORGETTING_FACTOR,
                     default=o.get(CONF_FORGETTING_FACTOR, DEFAULT_FORGETTING_FACTOR),

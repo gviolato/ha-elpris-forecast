@@ -8,8 +8,9 @@ merged with a **7-day forecast** and **learned p10/p50/p90 uncertainty bands**.
 * 7-day forecast from `https://elpriser.dk/data/prognose.json`
 * Every forecast ever seen is stored in SQLite and scored against the published price once it
   is known; the residuals feed an exponentially-forgetting (EWMA) error model per horizon.
-* Until the model has enough history for a horizon, the publisher's own p10/p90 band is used
-  (`band_source: publisher`), afterwards the learned band (`band_source: model`).
+* Two uncertainty bands per forecast hour: the publisher's own p10/p90 (asymmetric, shown by
+  default) and the learned Gaussian EWMA band. The option *Band shown on forecast hours* picks
+  one; the other is the fallback where the preferred one is missing (`band_source` tells which).
 
 Data: [Elpriser.dk](https://elpriser.dk/data/) (CC BY 4.0), based on Energinet / Energi Data Service.
 The source asks for at most one request per five minutes; this integration polls firm prices
@@ -100,7 +101,12 @@ times of day, so a single bucket is also a single hour of day), σ is made non-d
 sample size ≥ 5. Quantiles are Gaussian: `p50 = price − μ`, `p10/p90 = p50 ∓ 1.2816 σ`.
 
 The model is re-fitted from the full history whenever new residuals arrive or options change
-(*Configure* on the integration: λ, minimum days, minimum effective n, smoothing window).
+(*Configure* on the integration: band shown, λ, minimum days, minimum effective n, smoothing window).
+
+Note that this band is symmetric around p50, whereas price errors are typically right-skewed
+(spikes). That is why the publisher's asymmetric band is the default; the learned model is kept
+running, and since the full history is stored both bands can be back-tested later (coverage of
+p10/p90, pinball loss) by replaying the residuals.
 
 ## Dashboard example (apexcharts-card)
 
